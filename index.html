@@ -1,729 +1,321 @@
-<!DOCTYPE html>
-<html lang="zh-TW">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="description" content="使用 AI 視覺識別分析食物營養與熱量">
-  <title>午餐相機 - AI 飲食分析</title>
-  <style>
-    * {
-      margin: 0;
-      padding: 0;
-      box-sizing: border-box;
+import React, { useState } from 'react';
+import { Flame, Search, Sparkles, ChefHat, Settings } from 'lucide-react';
+
+const HotpotRecommender = () => {
+  const [userInput, setUserInput] = useState('');
+  const [recommendations, setRecommendations] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [apiKey, setApiKey] = useState('');
+  const [showSettings, setShowSettings] = useState(false);
+
+  // 火鍋菜單資料庫 - 可以輕鬆擴展
+  const menuItems = [
+    {
+      name: "極品和牛涮涮鍋",
+      category: "肉類",
+      description: "頂級A5和牛薄切，油花豐富，入口即化",
+      characteristics: ["高級", "油脂豐富", "軟嫩", "牛肉", "奢華", "細緻"],
+      cooking: "涮燙3-5秒",
+      price: "NT$880"
+    },
+    {
+      name: "麻辣豆腐鍋",
+      category: "湯底",
+      description: "四川麻辣湯底配豆腐，香辣過癮",
+      characteristics: ["辣", "麻", "重口味", "刺激", "豆製品", "內臟"],
+      cooking: "煮3-5分鐘",
+      price: "NT$380"
+    },
+    {
+      name: "海鮮拼盤",
+      category: "海鮮",
+      description: "新鮮草蝦、花枝、蛤蠣、鮮魚片綜合拼盤",
+      characteristics: ["海鮮", "鮮甜", "清淡", "健康", "低脂", "蛋白質"],
+      cooking: "涮燙至變色",
+      price: "NT$580"
+    },
+    {
+      name: "養生菌菇蔬菜盤",
+      category: "蔬菜",
+      description: "多種菇類搭配時令蔬菜，清爽健康",
+      characteristics: ["清淡", "健康", "素食", "纖維", "養生", "低卡"],
+      cooking: "煮2-3分鐘",
+      price: "NT$280"
+    }
+  ];
+
+  const analyzeWithGemini = async () => {
+    if (!userInput.trim()) {
+      setError('請輸入您想吃的食物特性');
+      return;
     }
 
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', sans-serif;
-      background: linear-gradient(135deg, #f0fdf4 0%, #d1fae5 100%);
-      min-height: 100vh;
-      padding: 24px;
+    if (!apiKey.trim()) {
+      setError('請先設定 Gemini API Key');
+      setShowSettings(true);
+      return;
     }
 
-    .container {
-      max-width: 1024px;
-      margin: 0 auto;
+    setLoading(true);
+    setError('');
+    setRecommendations([]);
+
+    try {
+      const prompt = `你是一個火鍋餐廳的智能推薦助手。
+
+用戶描述：「${userInput}」
+
+餐廳菜單：
+${menuItems.map((item, idx) => 
+  `${idx + 1}. ${item.name} (${item.category})
+  描述：${item.description}
+  特性：${item.characteristics.join('、')}
+  價格：${item.price}`
+).join('\n\n')}
+
+請分析用戶的描述，並推薦最適合的菜品。返回JSON格式：
+{
+  "recommendations": [
+    {
+      "itemIndex": 菜品索引(0-3),
+      "matchScore": 匹配分數(0-100),
+      "reason": "推薦理由（用繁體中文，30字以內）"
     }
+  ]
+}
 
-    .header {
-      text-align: center;
-      margin-bottom: 32px;
-    }
+請推薦1-3道最匹配的菜品，按匹配度排序。只返回JSON，不要其他文字。`;
 
-    .header-content {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 12px;
-      margin-bottom: 12px;
-    }
-
-    .header h1 {
-      font-size: 36px;
-      font-weight: bold;
-      color: #1f2937;
-    }
-
-    .header p {
-      color: #6b7280;
-    }
-
-    .settings-btn {
-      padding: 8px;
-      border-radius: 8px;
-      border: none;
-      background: rgba(255, 255, 255, 0.5);
-      cursor: pointer;
-      transition: background 0.2s;
-    }
-
-    .settings-btn:hover {
-      background: rgba(255, 255, 255, 0.8);
-    }
-
-    .card {
-      background: white;
-      border-radius: 16px;
-      box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
-      padding: 24px;
-      margin-bottom: 24px;
-    }
-
-    .upload-area {
-      border: 4px dashed #a7f3d0;
-      border-radius: 12px;
-      padding: 48px;
-      text-align: center;
-      cursor: pointer;
-      transition: all 0.3s;
-    }
-
-    .upload-area:hover {
-      border-color: #10b981;
-      background: #f0fdf4;
-    }
-
-    .upload-area h2 {
-      font-size: 24px;
-      color: #1f2937;
-      margin: 16px 0 8px;
-    }
-
-    .upload-area p {
-      color: #6b7280;
-    }
-
-    .upload-buttons {
-      display: flex;
-      gap: 12px;
-      justify-content: center;
-      margin-top: 20px;
-    }
-
-    .upload-btn {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      padding: 12px 24px;
-      border: 2px solid #10b981;
-      border-radius: 8px;
-      background: white;
-      color: #10b981;
-      font-weight: 600;
-      cursor: pointer;
-      transition: all 0.2s;
-    }
-
-    .upload-btn:hover {
-      background: #10b981;
-      color: white;
-    }
-
-    .upload-btn.camera {
-      background: #10b981;
-      color: white;
-    }
-
-    .upload-btn.camera:hover {
-      background: #059669;
-    }
-
-    .image-preview {
-      position: relative;
-    }
-
-    .image-preview img {
-      width: 100%;
-      max-height: 384px;
-      object-fit: cover;
-      border-radius: 12px;
-    }
-
-    .reset-btn {
-      position: absolute;
-      top: 16px;
-      right: 16px;
-      background: white;
-      border: none;
-      border-radius: 50%;
-      padding: 8px;
-      cursor: pointer;
-      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-    }
-
-    .reset-btn:hover {
-      background: #f3f4f6;
-    }
-
-    .btn {
-      width: 100%;
-      padding: 16px;
-      border: none;
-      border-radius: 12px;
-      font-size: 18px;
-      font-weight: 600;
-      cursor: pointer;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 8px;
-      transition: all 0.2s;
-      margin-top: 24px;
-    }
-
-    .btn-primary {
-      background: #10b981;
-      color: white;
-    }
-
-    .btn-primary:hover {
-      background: #059669;
-    }
-
-    .btn-secondary {
-      background: #e5e7eb;
-      color: #374151;
-    }
-
-    .btn-secondary:hover {
-      background: #d1d5db;
-    }
-
-    .loading {
-      text-align: center;
-      padding: 32px;
-    }
-
-    .spinner {
-      width: 48px;
-      height: 48px;
-      border: 4px solid #e5e7eb;
-      border-top-color: #10b981;
-      border-radius: 50%;
-      animation: spin 1s linear infinite;
-      margin: 0 auto 16px;
-    }
-
-    @keyframes spin {
-      to { transform: rotate(360deg); }
-    }
-
-    .calorie-card {
-      background: linear-gradient(135deg, #10b981 0%, #14b8a6 100%);
-      color: white;
-      padding: 32px;
-    }
-
-    .calorie-card h2 {
-      font-size: 24px;
-      margin-bottom: 8px;
-    }
-
-    .calorie-value {
-      font-size: 60px;
-      font-weight: bold;
-    }
-
-    .calorie-unit {
-      font-size: 24px;
-      margin-left: 8px;
-    }
-
-    .health-score {
-      display: inline-block;
-      background: rgba(255, 255, 255, 0.2);
-      padding: 4px 16px;
-      border-radius: 9999px;
-      margin-top: 16px;
-    }
-
-    .food-tags {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 8px;
-      margin-top: 16px;
-    }
-
-    .food-tag {
-      background: #d1fae5;
-      color: #065f46;
-      padding: 8px 16px;
-      border-radius: 9999px;
-      font-weight: 500;
-    }
-
-    .nutrients {
-      display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      gap: 16px;
-      margin-top: 16px;
-    }
-
-    .nutrient-card {
-      text-align: center;
-      padding: 16px;
-      border-radius: 12px;
-    }
-
-    .nutrient-card.protein { background: #dbeafe; }
-    .nutrient-card.carbs { background: #fef3c7; }
-    .nutrient-card.fat { background: #fed7aa; }
-
-    .nutrient-label {
-      font-size: 14px;
-      font-weight: 600;
-      margin-bottom: 4px;
-    }
-
-    .protein .nutrient-label { color: #1e40af; }
-    .carbs .nutrient-label { color: #92400e; }
-    .fat .nutrient-label { color: #9a3412; }
-
-    .nutrient-value {
-      font-size: 24px;
-      font-weight: bold;
-      color: #1f2937;
-    }
-
-    .tips {
-      margin-top: 16px;
-    }
-
-    .tip-item {
-      display: flex;
-      gap: 12px;
-      background: #f0fdf4;
-      padding: 12px;
-      border-radius: 8px;
-      margin-bottom: 8px;
-    }
-
-    .tip-number {
-      min-width: 24px;
-      height: 24px;
-      background: #10b981;
-      color: white;
-      border-radius: 50%;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 14px;
-      font-weight: bold;
-    }
-
-    .error-card {
-      background: #fef2f2;
-      border: 1px solid #fecaca;
-      text-align: center;
-      padding: 24px;
-    }
-
-    .error-card p {
-      color: #991b1b;
-      font-weight: 600;
-      margin: 12px 0;
-    }
-
-    .btn-error {
-      background: #dc2626;
-      color: white;
-      width: auto;
-      margin: 16px auto 0;
-      padding: 8px 24px;
-    }
-
-    .btn-error:hover {
-      background: #b91c1c;
-    }
-
-    input[type="password"] {
-      width: 100%;
-      padding: 8px 16px;
-      border: 1px solid #d1d5db;
-      border-radius: 8px;
-      font-size: 14px;
-    }
-
-    input[type="password"]:focus {
-      outline: none;
-      border-color: #10b981;
-      box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.1);
-    }
-
-    label {
-      display: block;
-      font-size: 14px;
-      font-weight: 500;
-      color: #374151;
-      margin-bottom: 8px;
-    }
-
-    .help-text {
-      font-size: 12px;
-      color: #6b7280;
-      margin-top: 8px;
-    }
-
-    .help-text a {
-      color: #10b981;
-      text-decoration: none;
-    }
-
-    .help-text a:hover {
-      text-decoration: underline;
-    }
-
-    .section-title {
-      font-size: 20px;
-      font-weight: bold;
-      color: #1f2937;
-      margin-bottom: 16px;
-      display: flex;
-      align-items: center;
-      gap: 8px;
-    }
-
-    svg {
-      width: 24px;
-      height: 24px;
-    }
-
-    .hidden {
-      display: none;
-    }
-
-    @media (max-width: 768px) {
-      .header h1 {
-        font-size: 28px;
-      }
-      
-      .upload-buttons {
-        flex-direction: column;
-      }
-      
-      .upload-btn {
-        width: 100%;
-        justify-content: center;
-      }
-      
-      .nutrients {
-        grid-template-columns: 1fr;
-      }
-    }
-  </style>
-</head>
-<body>
-  <div class="container">
-    <div class="header">
-      <div class="header-content">
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2">
-          <path d="M3 2v7c0 1.1.9 2 2 2h4a2 2 0 0 0 2-2V2"></path>
-          <path d="M7 2v20"></path>
-          <path d="M21 15V2v0a5 5 0 0 0-5 5v6c0 1.1.9 2 2 2h3Zm0 0v7"></path>
-        </svg>
-        <h1>午餐相機</h1>
-        <button class="settings-btn" onclick="toggleSettings()">
-          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="#6b7280" stroke-width="2">
-            <circle cx="12" cy="12" r="3"></circle>
-            <path d="M12 1v6m0 6v6m8.66-9l-5.2 3m-6.92 4L3.34 14M20.66 10l-5.2 3m-6.92 4L3.34 20"></path>
-          </svg>
-        </button>
-      </div>
-      <p>拍照即可分析食物營養與熱量</p>
-    </div>
-
-    <div id="settingsPanel" class="card hidden">
-      <h3 class="section-title">API 設定</h3>
-      <div>
-        <label>Google Gemini API Key</label>
-        <input type="password" id="apiKeyInput" placeholder="AIza..." onchange="saveApiKey()">
-        <p class="help-text">
-          您的 API Key 只會儲存在瀏覽器中，不會上傳到伺服器。
-          <a href="https://aistudio.google.com/app/apikey" target="_blank">取得免費 API Key</a>
-        </p>
-      </div>
-    </div>
-
-    <div id="uploadArea" class="card">
-      <input type="file" id="fileInput" accept="image/*" class="hidden" onchange="handleImageUpload(event)">
-      <input type="file" id="cameraInput" accept="image/*" capture="environment" class="hidden" onchange="handleImageUpload(event)">
-      <div class="upload-area">
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2" style="width: 64px; height: 64px; margin: 0 auto;">
-          <path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"></path>
-          <circle cx="12" cy="13" r="3"></circle>
-        </svg>
-        <h2>上傳食物照片</h2>
-        <p>選擇拍照或從相簿上傳</p>
-        <div class="upload-buttons">
-          <button class="upload-btn camera" onclick="document.getElementById('cameraInput').click()">
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 20px; height: 20px;">
-              <path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"></path>
-              <circle cx="12" cy="13" r="3"></circle>
-            </svg>
-            拍照
-          </button>
-          <button class="upload-btn" onclick="document.getElementById('fileInput').click()">
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 20px; height: 20px;">
-              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-              <polyline points="17 8 12 3 7 8"></polyline>
-              <line x1="12" y1="3" x2="12" y2="15"></line>
-            </svg>
-            從相簿選擇
-          </button>
-        </div>
-      </div>
-    </div>
-
-    <div id="previewArea" class="card hidden">
-      <div class="image-preview">
-        <img id="previewImage" src="" alt="上傳的食物">
-        <button class="reset-btn" onclick="reset()">
-          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="#6b7280" stroke-width="2" style="width: 20px; height: 20px;">
-            <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"></path>
-            <path d="M21 3v5h-5"></path>
-            <path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"></path>
-            <path d="M3 21v-5h5"></path>
-          </svg>
-        </button>
-      </div>
-      <button id="analyzeBtn" class="btn btn-primary" onclick="analyzeFood()">
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <polyline points="22 7 13.5 15.5 8.5 10.5 2 17"></polyline>
-          <polyline points="16 7 22 7 22 13"></polyline>
-        </svg>
-        開始分析
-      </button>
-    </div>
-
-    <div id="loadingArea" class="card hidden">
-      <div class="loading">
-        <div class="spinner"></div>
-        <p style="color: #6b7280;">AI 正在分析您的食物...</p>
-      </div>
-    </div>
-
-    <div id="resultArea" class="hidden">
-      <div class="card calorie-card">
-        <h2>總熱量</h2>
-        <div>
-          <span id="calorieValue" class="calorie-value">0</span>
-          <span class="calorie-unit">大卡</span>
-        </div>
-        <div class="health-score">
-          健康分數: <span id="healthScore">0</span>/10
-        </div>
-      </div>
-
-      <div class="card">
-        <h3 class="section-title">
-          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2">
-            <path d="M3 2v7c0 1.1.9 2 2 2h4a2 2 0 0 0 2-2V2"></path>
-            <path d="M7 2v20"></path>
-            <path d="M21 15V2v0a5 5 0 0 0-5 5v6c0 1.1.9 2 2 2h3Zm0 0v7"></path>
-          </svg>
-          識別的食物
-        </h3>
-        <div id="foodTags" class="food-tags"></div>
-      </div>
-
-      <div class="card">
-        <h3 class="section-title">營養成分</h3>
-        <div class="nutrients">
-          <div class="nutrient-card protein">
-            <div class="nutrient-label">蛋白質</div>
-            <div class="nutrient-value"><span id="proteinValue">0</span>g</div>
-          </div>
-          <div class="nutrient-card carbs">
-            <div class="nutrient-label">碳水化合物</div>
-            <div class="nutrient-value"><span id="carbsValue">0</span>g</div>
-          </div>
-          <div class="nutrient-card fat">
-            <div class="nutrient-label">脂肪</div>
-            <div class="nutrient-value"><span id="fatValue">0</span>g</div>
-          </div>
-        </div>
-      </div>
-
-      <div class="card">
-        <h3 class="section-title">
-          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2">
-            <circle cx="12" cy="12" r="10"></circle>
-            <line x1="12" y1="8" x2="12" y2="12"></line>
-            <line x1="12" y1="16" x2="12.01" y2="16"></line>
-          </svg>
-          健康建議
-        </h3>
-        <p id="adviceText" style="color: #374151; line-height: 1.6; margin-bottom: 16px;"></p>
-        <div id="tipsArea" class="tips"></div>
-      </div>
-
-      <button class="btn btn-secondary" onclick="reset()">分析其他食物</button>
-    </div>
-
-    <div id="errorArea" class="card error-card hidden">
-      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="#dc2626" stroke-width="2" style="width: 48px; height: 48px; margin: 0 auto;">
-        <circle cx="12" cy="12" r="10"></circle>
-        <line x1="12" y1="8" x2="12" y2="12"></line>
-        <line x1="12" y1="16" x2="12.01" y2="16"></line>
-      </svg>
-      <p id="errorMessage"></p>
-      <button class="btn btn-error" onclick="reset()">重新開始</button>
-    </div>
-  </div>
-
-  <script>
-    let currentImage = null;
-
-    window.onload = function() {
-      const savedKey = localStorage.getItem('gemini_api_key');
-      if (savedKey) {
-        document.getElementById('apiKeyInput').value = savedKey;
-      }
-    };
-
-    function toggleSettings() {
-      const panel = document.getElementById('settingsPanel');
-      panel.classList.toggle('hidden');
-    }
-
-    function saveApiKey() {
-      const key = document.getElementById('apiKeyInput').value;
-      localStorage.setItem('gemini_api_key', key);
-    }
-
-    function handleImageUpload(event) {
-      const file = event.target.files[0];
-      if (file) {
-        const reader = new FileReader();
-        reader.onload = function(e) {
-          currentImage = e.target.result;
-          document.getElementById('previewImage').src = currentImage;
-          document.getElementById('uploadArea').classList.add('hidden');
-          document.getElementById('previewArea').classList.remove('hidden');
-        };
-        reader.readAsDataURL(file);
-      }
-    }
-
-    async function analyzeFood() {
-      const apiKey = document.getElementById('apiKeyInput').value.trim();
-      
-      if (!apiKey) {
-        showError('請先在設定中輸入您的 Gemini API Key');
-        return;
-      }
-    
-      document.getElementById('previewArea').classList.add('hidden');
-      document.getElementById('loadingArea').classList.remove('hidden');
-    
-      try {
-        const base64Data = currentImage.split(',')[1];
-        const mimeType = currentImage.split(',')[0].split(':')[1].split(';')[0];
-    
-        // UPDATED: Using v1beta for better model compatibility
-        // 使用 v1beta 搭配 gemini-1.5-flash 是目前最穩定的組合
-        // 將原本的 v1 或 v1beta 網址改為以下內容
-        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`, {
+      const response = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`,
+        {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: {
+            'Content-Type': 'application/json',
+          },
           body: JSON.stringify({
-            contents: [{
-              parts: [
-                {
-                  text: `請分析這張食物照片，並以繁體中文回應。請提供以下資訊（僅以 JSON 格式回應，不要有任何其他文字或markdown標記）：
+            contents: [
+              {
+                parts: [
                   {
-                    "foods": ["食物1", "食物2"],
-                    "totalCalories": 數字,
-                    "nutrients": {
-                      "protein": "數字",
-                      "carbs": "數字",
-                      "fat": "數字"
-                    },
-                    "healthScore": 1到10的數字,
-                    "advice": "建議文字",
-                    "tips": ["建議1", "建議2"]
-                  }`
-                },
-                {
-                  inlineData: {
-                    mimeType: mimeType,
-                    data: base64Data
+                    text: prompt
                   }
-                }
-              ]
-            }]
+                ]
+              }
+            ],
+            generationConfig: {
+              temperature: 0.7,
+              maxOutputTokens: 1000,
+            }
           })
-        });
-    
-        const data = await response.json();
-    
-        if (data.error) {
-          throw new Error(data.error.message || 'API 請求失敗');
         }
-    
-        let textContent = data.candidates[0].content.parts[0].text;
-        
-        // Improved JSON extraction: removes markdown code blocks if the AI includes them
-        const cleanJson = textContent.replace(/```json|```/g, '').trim();
-        const result = JSON.parse(cleanJson);
-    
-        displayResult(result);
-      } catch (error) {
-        console.error('分析錯誤:', error);
-        showError(error.message || '分析時發生錯誤，請檢查 API Key 是否正確');
-      } finally {
-        document.getElementById('loadingArea').classList.add('hidden');
+      );
+
+      if (!response.ok) {
+        throw new Error('API 請求失敗，請檢查 API Key 是否正確');
       }
+
+      const data = await response.json();
+      
+      if (!data.candidates || !data.candidates[0] || !data.candidates[0].content) {
+        throw new Error('API 返回格式錯誤');
+      }
+
+      const text = data.candidates[0].content.parts[0].text;
+      const cleanText = text.replace(/```json|```/g, '').trim();
+      const result = JSON.parse(cleanText);
+
+      const recommendedItems = result.recommendations.map(rec => ({
+        ...menuItems[rec.itemIndex],
+        matchScore: rec.matchScore,
+        reason: rec.reason
+      }));
+
+      setRecommendations(recommendedItems);
+    } catch (err) {
+      console.error('推薦錯誤:', err);
+      setError(err.message || '推薦系統暫時無法使用，請檢查 API Key 或稍後再試');
+    } finally {
+      setLoading(false);
     }
+  };
 
-    function displayResult(result) {
-      document.getElementById('calorieValue').textContent = result.totalCalories;
-      document.getElementById('healthScore').textContent = result.healthScore;
-      document.getElementById('proteinValue').textContent = result.nutrients.protein;
-      document.getElementById('carbsValue').textContent = result.nutrients.carbs;
-      document.getElementById('fatValue').textContent = result.nutrients.fat;
-      document.getElementById('adviceText').textContent = result.advice;
-
-      const foodTags = document.getElementById('foodTags');
-      foodTags.innerHTML = '';
-      result.foods.forEach(food => {
-        const tag = document.createElement('span');
-        tag.className = 'food-tag';
-        tag.textContent = food;
-        foodTags.appendChild(tag);
-      });
-
-      const tipsArea = document.getElementById('tipsArea');
-      tipsArea.innerHTML = '';
-      result.tips.forEach((tip, idx) => {
-        const tipItem = document.createElement('div');
-        tipItem.className = 'tip-item';
-        tipItem.innerHTML = `
-          <div class="tip-number">${idx + 1}</div>
-          <p style="color: #374151;">${tip}</p>
-        `;
-        tipsArea.appendChild(tipItem);
-      });
-
-      document.getElementById('resultArea').classList.remove('hidden');
+  const handleKeyPress = (e) => {
+    if (e.key === 'Enter' && !loading) {
+      analyzeWithGemini();
     }
+  };
 
-    function showError(message) {
-      document.getElementById('errorMessage').textContent = message;
-      document.getElementById('errorArea').classList.remove('hidden');
-      document.getElementById('previewArea').classList.add('hidden');
-      document.getElementById('loadingArea').classList.add('hidden');
+  const saveApiKey = () => {
+    if (apiKey.trim()) {
+      localStorage.setItem('gemini_api_key', apiKey);
+      setShowSettings(false);
+      setError('');
     }
+  };
 
-    function reset() {
-      currentImage = null;
-      document.getElementById('fileInput').value = '';
-      document.getElementById('cameraInput').value = '';
-      document.getElementById('uploadArea').classList.remove('hidden');
-      document.getElementById('previewArea').classList.add('hidden');
-      document.getElementById('resultArea').classList.add('hidden');
-      document.getElementById('errorArea').classList.add('hidden');
-      document.getElementById('loadingArea').classList.add('hidden');
+  // 載入儲存的 API Key
+  React.useEffect(() => {
+    const saved = localStorage.getItem('gemini_api_key');
+    if (saved) {
+      setApiKey(saved);
     }
-  </script>
-</body>
-</html>
+  }, []);
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-red-50 to-orange-50 p-6">
+      <div className="max-w-4xl mx-auto">
+        {/* 標題 */}
+        <div className="text-center mb-8">
+          <div className="flex items-center justify-center gap-3 mb-4">
+            <Flame className="w-10 h-10 text-red-500" />
+            <h1 className="text-4xl font-bold text-gray-800">火鍋智能推薦</h1>
+            <Flame className="w-10 h-10 text-red-500" />
+          </div>
+          <p className="text-gray-600">告訴我們您想吃什麼，AI 為您推薦最適合的菜品</p>
+          <button
+            onClick={() => setShowSettings(!showSettings)}
+            className="mt-3 text-sm text-gray-500 hover:text-gray-700 flex items-center gap-1 mx-auto"
+          >
+            <Settings className="w-4 h-4" />
+            {apiKey ? 'API Key 已設定' : '設定 API Key'}
+          </button>
+        </div>
+
+        {/* API Key 設定 */}
+        {showSettings && (
+          <div className="bg-white rounded-2xl shadow-lg p-6 mb-6">
+            <h3 className="text-lg font-semibold text-gray-800 mb-3">Gemini API Key 設定</h3>
+            <p className="text-sm text-gray-600 mb-3">
+              請到 <a href="https://makersuite.google.com/app/apikey" target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:underline">Google AI Studio</a> 取得免費 API Key
+            </p>
+            <div className="flex gap-3">
+              <input
+                type="password"
+                value={apiKey}
+                onChange={(e) => setApiKey(e.target.value)}
+                placeholder="輸入您的 Gemini API Key"
+                className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent"
+              />
+              <button
+                onClick={saveApiKey}
+                className="px-6 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors"
+              >
+                儲存
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* 輸入區 */}
+        <div className="bg-white rounded-2xl shadow-lg p-6 mb-6">
+          <label className="block text-sm font-medium text-gray-700 mb-3">
+            描述您想吃的食物特性
+          </label>
+          <div className="flex gap-3">
+            <input
+              type="text"
+              value={userInput}
+              onChange={(e) => setUserInput(e.target.value)}
+              onKeyPress={handleKeyPress}
+              placeholder="例如：我想吃辣的、我想吃清淡健康的、我想吃高級的肉類..."
+              className="flex-1 px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent"
+            />
+            <button
+              onClick={analyzeWithGemini}
+              disabled={loading}
+              className="px-6 py-3 bg-red-500 text-white rounded-lg hover:bg-red-600 disabled:bg-gray-300 disabled:cursor-not-allowed flex items-center gap-2 transition-colors"
+            >
+              {loading ? (
+                <>
+                  <Sparkles className="w-5 h-5 animate-spin" />
+                  分析中
+                </>
+              ) : (
+                <>
+                  <Search className="w-5 h-5" />
+                  推薦菜品
+                </>
+              )}
+            </button>
+          </div>
+          {error && (
+            <p className="mt-3 text-red-500 text-sm">{error}</p>
+          )}
+        </div>
+
+        {/* 推薦結果 */}
+        {recommendations.length > 0 && (
+          <div className="space-y-4">
+            <h2 className="text-2xl font-bold text-gray-800 flex items-center gap-2">
+              <ChefHat className="w-6 h-6" />
+              為您推薦
+            </h2>
+            {recommendations.map((item, idx) => (
+              <div
+                key={idx}
+                className="bg-white rounded-xl shadow-md p-6 hover:shadow-lg transition-shadow"
+              >
+                <div className="flex justify-between items-start mb-3">
+                  <div>
+                    <h3 className="text-xl font-bold text-gray-800">{item.name}</h3>
+                    <span className="inline-block px-3 py-1 bg-red-100 text-red-700 rounded-full text-sm mt-2">
+                      {item.category}
+                    </span>
+                  </div>
+                  <div className="text-right">
+                    <div className="text-2xl font-bold text-red-500">{item.price}</div>
+                    <div className="text-sm text-gray-500 mt-1">
+                      匹配度: {item.matchScore}%
+                    </div>
+                  </div>
+                </div>
+                
+                <p className="text-gray-600 mb-3">{item.description}</p>
+                
+                <div className="bg-yellow-50 border-l-4 border-yellow-400 p-3 mb-3">
+                  <p className="text-sm text-gray-700">
+                    <span className="font-semibold">推薦理由：</span>
+                    {item.reason}
+                  </p>
+                </div>
+
+                <div className="flex flex-wrap gap-2 mb-3">
+                  {item.characteristics.map((char, i) => (
+                    <span
+                      key={i}
+                      className="px-3 py-1 bg-gray-100 text-gray-700 rounded-full text-sm"
+                    >
+                      {char}
+                    </span>
+                  ))}
+                </div>
+
+                <p className="text-sm text-gray-500">
+                  <span className="font-semibold">烹飪建議：</span>
+                  {item.cooking}
+                </p>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* 使用提示 */}
+        {recommendations.length === 0 && !loading && (
+          <div className="bg-white rounded-xl shadow-md p-6">
+            <h3 className="text-lg font-semibold text-gray-800 mb-4">💡 使用提示</h3>
+            <ul className="space-y-2 text-gray-600">
+              <li>• 描述您喜歡的口味：辣的、清淡的、鮮甜的</li>
+              <li>• 描述食材類型：肉類、海鮮、蔬菜</li>
+              <li>• 描述偏好：健康的、高級的、養生的</li>
+              <li>• 或直接說：我想吃麻辣的、我想吃牛肉</li>
+            </ul>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+export default HotpotRecommender;
