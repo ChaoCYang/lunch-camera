@@ -274,7 +274,9 @@ ${menuItems.map((item, idx) =>
                 );
 
                 if (!response.ok) {
-                    throw new Error('API 請求失敗，請檢查 API Key 是否正確');
+                    const errorData = await response.json();
+                    console.error('API 錯誤詳情:', errorData);
+                    throw new Error(`API 錯誤: ${errorData.error?.message || '請檢查 API Key 是否正確'}`);
                 }
 
                 const data = await response.json();
