@@ -1,68 +1,235 @@
-import React, { useState } from 'react';
-import { Flame, Search, Sparkles, ChefHat, Settings } from 'lucide-react';
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>火鍋智能推薦系統</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        .animate-spin {
+            animation: spin 1s linear infinite;
+        }
+    </style>
+</head>
+<body class="bg-gradient-to-br from-red-50 to-orange-50 min-h-screen">
+    <div class="max-w-4xl mx-auto p-6">
+        <!-- 標題 -->
+        <div class="text-center mb-8">
+            <div class="flex items-center justify-center gap-3 mb-4">
+                <svg class="w-10 h-10 text-red-500" fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M13.5.67s.74 2.65.74 4.8c0 2.06-1.35 3.73-3.41 3.73-2.07 0-3.63-1.67-3.63-3.73l.03-.36C5.21 7.51 4 10.62 4 14c0 4.42 3.58 8 8 8s8-3.58 8-8C20 8.61 17.41 3.8 13.5.67zM11.71 19c-1.78 0-3.22-1.4-3.22-3.14 0-1.62 1.05-2.76 2.81-3.12 1.77-.36 3.6-1.21 4.62-2.58.39 1.29.59 2.65.59 4.04 0 2.65-2.15 4.8-4.8 4.8z"/>
+                </svg>
+                <h1 class="text-4xl font-bold text-gray-800">火鍋智能推薦</h1>
+                <svg class="w-10 h-10 text-red-500" fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M13.5.67s.74 2.65.74 4.8c0 2.06-1.35 3.73-3.41 3.73-2.07 0-3.63-1.67-3.63-3.73l.03-.36C5.21 7.51 4 10.62 4 14c0 4.42 3.58 8 8 8s8-3.58 8-8C20 8.61 17.41 3.8 13.5.67zM11.71 19c-1.78 0-3.22-1.4-3.22-3.14 0-1.62 1.05-2.76 2.81-3.12 1.77-.36 3.6-1.21 4.62-2.58.39 1.29.59 2.65.59 4.04 0 2.65-2.15 4.8-4.8 4.8z"/>
+                </svg>
+            </div>
+            <p class="text-gray-600">告訴我們您想吃什麼，AI 為您推薦最適合的菜品</p>
+            <button onclick="toggleSettings()" class="mt-3 text-sm text-gray-500 hover:text-gray-700 flex items-center gap-1 mx-auto">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path>
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                </svg>
+                <span id="apiKeyStatus">設定 API Key</span>
+            </button>
+        </div>
 
-const HotpotRecommender = () => {
-  const [userInput, setUserInput] = useState('');
-  const [recommendations, setRecommendations] = useState([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
-  const [apiKey, setApiKey] = useState('');
-  const [showSettings, setShowSettings] = useState(false);
+        <!-- API Key 設定 -->
+        <div id="settingsPanel" class="bg-white rounded-2xl shadow-lg p-6 mb-6 hidden">
+            <h3 class="text-lg font-semibold text-gray-800 mb-3">Gemini API Key 設定</h3>
+            <p class="text-sm text-gray-600 mb-3">
+                請到 <a href="https://makersuite.google.com/app/apikey" target="_blank" rel="noopener noreferrer" class="text-blue-500 hover:underline">Google AI Studio</a> 取得免費 API Key
+            </p>
+            <div class="flex gap-3">
+                <input
+                    type="password"
+                    id="apiKeyInput"
+                    placeholder="輸入您的 Gemini API Key"
+                    class="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent focus:outline-none"
+                />
+                <button
+                    onclick="saveApiKey()"
+                    class="px-6 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors"
+                >
+                    儲存
+                </button>
+            </div>
+        </div>
 
-  // 火鍋菜單資料庫 - 可以輕鬆擴展
-  const menuItems = [
-    {
-      name: "極品和牛涮涮鍋",
-      category: "肉類",
-      description: "頂級A5和牛薄切，油花豐富，入口即化",
-      characteristics: ["高級", "油脂豐富", "軟嫩", "牛肉", "奢華", "細緻"],
-      cooking: "涮燙3-5秒",
-      price: "NT$880"
-    },
-    {
-      name: "麻辣豆腐鍋",
-      category: "湯底",
-      description: "四川麻辣湯底配豆腐，香辣過癮",
-      characteristics: ["辣", "麻", "重口味", "刺激", "豆製品", "內臟"],
-      cooking: "煮3-5分鐘",
-      price: "NT$380"
-    },
-    {
-      name: "海鮮拼盤",
-      category: "海鮮",
-      description: "新鮮草蝦、花枝、蛤蠣、鮮魚片綜合拼盤",
-      characteristics: ["海鮮", "鮮甜", "清淡", "健康", "低脂", "蛋白質"],
-      cooking: "涮燙至變色",
-      price: "NT$580"
-    },
-    {
-      name: "養生菌菇蔬菜盤",
-      category: "蔬菜",
-      description: "多種菇類搭配時令蔬菜，清爽健康",
-      characteristics: ["清淡", "健康", "素食", "纖維", "養生", "低卡"],
-      cooking: "煮2-3分鐘",
-      price: "NT$280"
-    }
-  ];
+        <!-- 輸入區 -->
+        <div class="bg-white rounded-2xl shadow-lg p-6 mb-6">
+            <label class="block text-sm font-medium text-gray-700 mb-3">
+                描述您想吃的食物特性
+            </label>
+            <div class="flex gap-3">
+                <input
+                    type="text"
+                    id="userInput"
+                    placeholder="例如：我想吃辣的、我想吃清淡健康的、我想吃高級的肉類..."
+                    class="flex-1 px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent focus:outline-none"
+                    onkeypress="handleKeyPress(event)"
+                />
+                <button
+                    id="searchBtn"
+                    onclick="analyzeWithGemini()"
+                    class="px-6 py-3 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors flex items-center gap-2"
+                >
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+                    </svg>
+                    推薦菜品
+                </button>
+            </div>
+            <p id="errorMessage" class="mt-3 text-red-500 text-sm hidden"></p>
+        </div>
 
-  const analyzeWithGemini = async () => {
-    if (!userInput.trim()) {
-      setError('請輸入您想吃的食物特性');
-      return;
-    }
+        <!-- 推薦結果 -->
+        <div id="recommendations" class="space-y-4 hidden">
+            <h2 class="text-2xl font-bold text-gray-800 flex items-center gap-2">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"></path>
+                </svg>
+                為您推薦
+            </h2>
+            <div id="recommendationsList"></div>
+        </div>
 
-    if (!apiKey.trim()) {
-      setError('請先設定 Gemini API Key');
-      setShowSettings(true);
-      return;
-    }
+        <!-- 使用提示 -->
+        <div id="usageTips" class="bg-white rounded-xl shadow-md p-6">
+            <h3 class="text-lg font-semibold text-gray-800 mb-4">💡 使用提示</h3>
+            <ul class="space-y-2 text-gray-600">
+                <li>• 描述您喜歡的口味：辣的、清淡的、鮮甜的</li>
+                <li>• 描述食材類型：肉類、海鮮、蔬菜</li>
+                <li>• 描述偏好：健康的、高級的、養生的</li>
+                <li>• 或直接說：我想吃麻辣的、我想吃牛肉</li>
+            </ul>
+        </div>
+    </div>
 
-    setLoading(true);
-    setError('');
-    setRecommendations([]);
+    <script>
+        // 火鍋菜單資料庫
+        const menuItems = [
+            {
+                name: "極品和牛涮涮鍋",
+                category: "肉類",
+                description: "頂級A5和牛薄切，油花豐富，入口即化",
+                characteristics: ["高級", "油脂豐富", "軟嫩", "牛肉", "奢華", "細緻"],
+                cooking: "涮燙3-5秒",
+                price: "NT$880"
+            },
+            {
+                name: "麻辣鴨血豆腐鍋",
+                category: "湯底",
+                description: "四川麻辣湯底配嫩滑鴨血和豆腐，香辣過癮",
+                characteristics: ["辣", "麻", "重口味", "刺激", "豆製品", "內臟"],
+                cooking: "煮3-5分鐘",
+                price: "NT$380"
+            },
+            {
+                name: "海鮮拼盤",
+                category: "海鮮",
+                description: "新鮮草蝦、花枝、蛤蠣、鮮魚片綜合拼盤",
+                characteristics: ["海鮮", "鮮甜", "清淡", "健康", "低脂", "蛋白質"],
+                cooking: "涮燙至變色",
+                price: "NT$580"
+            },
+            {
+                name: "養生菌菇蔬菜盤",
+                category: "蔬菜",
+                description: "多種菇類搭配時令蔬菜，清爽健康",
+                characteristics: ["清淡", "健康", "素食", "纖維", "養生", "低卡"],
+                cooking: "煮2-3分鐘",
+                price: "NT$280"
+            }
+        ];
 
-    try {
-      const prompt = `你是一個火鍋餐廳的智能推薦助手。
+        // 載入 API Key
+        window.onload = function() {
+            const savedKey = localStorage.getItem('gemini_api_key');
+            if (savedKey) {
+                document.getElementById('apiKeyInput').value = savedKey;
+                document.getElementById('apiKeyStatus').textContent = 'API Key 已設定';
+            }
+        };
+
+        function toggleSettings() {
+            const panel = document.getElementById('settingsPanel');
+            panel.classList.toggle('hidden');
+        }
+
+        function saveApiKey() {
+            const apiKey = document.getElementById('apiKeyInput').value.trim();
+            if (apiKey) {
+                localStorage.setItem('gemini_api_key', apiKey);
+                document.getElementById('apiKeyStatus').textContent = 'API Key 已設定';
+                document.getElementById('settingsPanel').classList.add('hidden');
+                showError('');
+            }
+        }
+
+        function handleKeyPress(event) {
+            if (event.key === 'Enter') {
+                analyzeWithGemini();
+            }
+        }
+
+        function showError(message) {
+            const errorEl = document.getElementById('errorMessage');
+            if (message) {
+                errorEl.textContent = message;
+                errorEl.classList.remove('hidden');
+            } else {
+                errorEl.classList.add('hidden');
+            }
+        }
+
+        function setLoading(isLoading) {
+            const btn = document.getElementById('searchBtn');
+            if (isLoading) {
+                btn.disabled = true;
+                btn.classList.add('opacity-50', 'cursor-not-allowed');
+                btn.innerHTML = `
+                    <svg class="w-5 h-5 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
+                    </svg>
+                    分析中
+                `;
+            } else {
+                btn.disabled = false;
+                btn.classList.remove('opacity-50', 'cursor-not-allowed');
+                btn.innerHTML = `
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+                    </svg>
+                    推薦菜品
+                `;
+            }
+        }
+
+        async function analyzeWithGemini() {
+            const userInput = document.getElementById('userInput').value.trim();
+            const apiKey = localStorage.getItem('gemini_api_key');
+
+            if (!userInput) {
+                showError('請輸入您想吃的食物特性');
+                return;
+            }
+
+            if (!apiKey) {
+                showError('請先設定 Gemini API Key');
+                document.getElementById('settingsPanel').classList.remove('hidden');
+                return;
+            }
+
+            setLoading(true);
+            showError('');
+            document.getElementById('recommendations').classList.add('hidden');
+
+            try {
+                const prompt = `你是一個火鍋餐廳的智能推薦助手。
 
 用戶描述：「${userInput}」
 
@@ -87,235 +254,101 @@ ${menuItems.map((item, idx) =>
 
 請推薦1-3道最匹配的菜品，按匹配度排序。只返回JSON，不要其他文字。`;
 
-      const response = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            contents: [
-              {
-                parts: [
-                  {
-                    text: prompt
-                  }
-                ]
-              }
-            ],
-            generationConfig: {
-              temperature: 0.7,
-              maxOutputTokens: 1000,
+                const response = await fetch(
+                    `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`,
+                    {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({
+                            contents: [{
+                                parts: [{ text: prompt }]
+                            }],
+                            generationConfig: {
+                                temperature: 0.7,
+                                maxOutputTokens: 1000,
+                            }
+                        })
+                    }
+                );
+
+                if (!response.ok) {
+                    throw new Error('API 請求失敗，請檢查 API Key 是否正確');
+                }
+
+                const data = await response.json();
+                
+                if (!data.candidates || !data.candidates[0] || !data.candidates[0].content) {
+                    throw new Error('API 返回格式錯誤');
+                }
+
+                const text = data.candidates[0].content.parts[0].text;
+                const cleanText = text.replace(/```json|```/g, '').trim();
+                const result = JSON.parse(cleanText);
+
+                displayRecommendations(result.recommendations);
+
+            } catch (error) {
+                console.error('推薦錯誤:', error);
+                showError(error.message || '推薦系統暫時無法使用，請檢查 API Key 或稍後再試');
+            } finally {
+                setLoading(false);
             }
-          })
         }
-      );
 
-      if (!response.ok) {
-        throw new Error('API 請求失敗，請檢查 API Key 是否正確');
-      }
+        function displayRecommendations(recommendations) {
+            const container = document.getElementById('recommendationsList');
+            container.innerHTML = '';
 
-      const data = await response.json();
-      
-      if (!data.candidates || !data.candidates[0] || !data.candidates[0].content) {
-        throw new Error('API 返回格式錯誤');
-      }
-
-      const text = data.candidates[0].content.parts[0].text;
-      const cleanText = text.replace(/```json|```/g, '').trim();
-      const result = JSON.parse(cleanText);
-
-      const recommendedItems = result.recommendations.map(rec => ({
-        ...menuItems[rec.itemIndex],
-        matchScore: rec.matchScore,
-        reason: rec.reason
-      }));
-
-      setRecommendations(recommendedItems);
-    } catch (err) {
-      console.error('推薦錯誤:', err);
-      setError(err.message || '推薦系統暫時無法使用，請檢查 API Key 或稍後再試');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleKeyPress = (e) => {
-    if (e.key === 'Enter' && !loading) {
-      analyzeWithGemini();
-    }
-  };
-
-  const saveApiKey = () => {
-    if (apiKey.trim()) {
-      localStorage.setItem('gemini_api_key', apiKey);
-      setShowSettings(false);
-      setError('');
-    }
-  };
-
-  // 載入儲存的 API Key
-  React.useEffect(() => {
-    const saved = localStorage.getItem('gemini_api_key');
-    if (saved) {
-      setApiKey(saved);
-    }
-  }, []);
-
-  return (
-    <div className="min-h-screen bg-gradient-to-br from-red-50 to-orange-50 p-6">
-      <div className="max-w-4xl mx-auto">
-        {/* 標題 */}
-        <div className="text-center mb-8">
-          <div className="flex items-center justify-center gap-3 mb-4">
-            <Flame className="w-10 h-10 text-red-500" />
-            <h1 className="text-4xl font-bold text-gray-800">火鍋智能推薦</h1>
-            <Flame className="w-10 h-10 text-red-500" />
-          </div>
-          <p className="text-gray-600">告訴我們您想吃什麼，AI 為您推薦最適合的菜品</p>
-          <button
-            onClick={() => setShowSettings(!showSettings)}
-            className="mt-3 text-sm text-gray-500 hover:text-gray-700 flex items-center gap-1 mx-auto"
-          >
-            <Settings className="w-4 h-4" />
-            {apiKey ? 'API Key 已設定' : '設定 API Key'}
-          </button>
-        </div>
-
-        {/* API Key 設定 */}
-        {showSettings && (
-          <div className="bg-white rounded-2xl shadow-lg p-6 mb-6">
-            <h3 className="text-lg font-semibold text-gray-800 mb-3">Gemini API Key 設定</h3>
-            <p className="text-sm text-gray-600 mb-3">
-              請到 <a href="https://makersuite.google.com/app/apikey" target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:underline">Google AI Studio</a> 取得免費 API Key
-            </p>
-            <div className="flex gap-3">
-              <input
-                type="password"
-                value={apiKey}
-                onChange={(e) => setApiKey(e.target.value)}
-                placeholder="輸入您的 Gemini API Key"
-                className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent"
-              />
-              <button
-                onClick={saveApiKey}
-                className="px-6 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors"
-              >
-                儲存
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* 輸入區 */}
-        <div className="bg-white rounded-2xl shadow-lg p-6 mb-6">
-          <label className="block text-sm font-medium text-gray-700 mb-3">
-            描述您想吃的食物特性
-          </label>
-          <div className="flex gap-3">
-            <input
-              type="text"
-              value={userInput}
-              onChange={(e) => setUserInput(e.target.value)}
-              onKeyPress={handleKeyPress}
-              placeholder="例如：我想吃辣的、我想吃清淡健康的、我想吃高級的肉類..."
-              className="flex-1 px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent"
-            />
-            <button
-              onClick={analyzeWithGemini}
-              disabled={loading}
-              className="px-6 py-3 bg-red-500 text-white rounded-lg hover:bg-red-600 disabled:bg-gray-300 disabled:cursor-not-allowed flex items-center gap-2 transition-colors"
-            >
-              {loading ? (
-                <>
-                  <Sparkles className="w-5 h-5 animate-spin" />
-                  分析中
-                </>
-              ) : (
-                <>
-                  <Search className="w-5 h-5" />
-                  推薦菜品
-                </>
-              )}
-            </button>
-          </div>
-          {error && (
-            <p className="mt-3 text-red-500 text-sm">{error}</p>
-          )}
-        </div>
-
-        {/* 推薦結果 */}
-        {recommendations.length > 0 && (
-          <div className="space-y-4">
-            <h2 className="text-2xl font-bold text-gray-800 flex items-center gap-2">
-              <ChefHat className="w-6 h-6" />
-              為您推薦
-            </h2>
-            {recommendations.map((item, idx) => (
-              <div
-                key={idx}
-                className="bg-white rounded-xl shadow-md p-6 hover:shadow-lg transition-shadow"
-              >
-                <div className="flex justify-between items-start mb-3">
-                  <div>
-                    <h3 className="text-xl font-bold text-gray-800">{item.name}</h3>
-                    <span className="inline-block px-3 py-1 bg-red-100 text-red-700 rounded-full text-sm mt-2">
-                      {item.category}
-                    </span>
-                  </div>
-                  <div className="text-right">
-                    <div className="text-2xl font-bold text-red-500">{item.price}</div>
-                    <div className="text-sm text-gray-500 mt-1">
-                      匹配度: {item.matchScore}%
+            recommendations.forEach(rec => {
+                const item = menuItems[rec.itemIndex];
+                const card = document.createElement('div');
+                card.className = 'bg-white rounded-xl shadow-md p-6 hover:shadow-lg transition-shadow';
+                
+                card.innerHTML = `
+                    <div class="flex justify-between items-start mb-3">
+                        <div>
+                            <h3 class="text-xl font-bold text-gray-800">${item.name}</h3>
+                            <span class="inline-block px-3 py-1 bg-red-100 text-red-700 rounded-full text-sm mt-2">
+                                ${item.category}
+                            </span>
+                        </div>
+                        <div class="text-right">
+                            <div class="text-2xl font-bold text-red-500">${item.price}</div>
+                            <div class="text-sm text-gray-500 mt-1">
+                                匹配度: ${rec.matchScore}%
+                            </div>
+                        </div>
                     </div>
-                  </div>
-                </div>
+                    
+                    <p class="text-gray-600 mb-3">${item.description}</p>
+                    
+                    <div class="bg-yellow-50 border-l-4 border-yellow-400 p-3 mb-3">
+                        <p class="text-sm text-gray-700">
+                            <span class="font-semibold">推薦理由：</span>
+                            ${rec.reason}
+                        </p>
+                    </div>
+
+                    <div class="flex flex-wrap gap-2 mb-3">
+                        ${item.characteristics.map(char => 
+                            `<span class="px-3 py-1 bg-gray-100 text-gray-700 rounded-full text-sm">${char}</span>`
+                        ).join('')}
+                    </div>
+
+                    <p class="text-sm text-gray-500">
+                        <span class="font-semibold">烹飪建議：</span>
+                        ${item.cooking}
+                    </p>
+                `;
                 
-                <p className="text-gray-600 mb-3">{item.description}</p>
-                
-                <div className="bg-yellow-50 border-l-4 border-yellow-400 p-3 mb-3">
-                  <p className="text-sm text-gray-700">
-                    <span className="font-semibold">推薦理由：</span>
-                    {item.reason}
-                  </p>
-                </div>
+                container.appendChild(card);
+            });
 
-                <div className="flex flex-wrap gap-2 mb-3">
-                  {item.characteristics.map((char, i) => (
-                    <span
-                      key={i}
-                      className="px-3 py-1 bg-gray-100 text-gray-700 rounded-full text-sm"
-                    >
-                      {char}
-                    </span>
-                  ))}
-                </div>
-
-                <p className="text-sm text-gray-500">
-                  <span className="font-semibold">烹飪建議：</span>
-                  {item.cooking}
-                </p>
-              </div>
-            ))}
-          </div>
-        )}
-
-        {/* 使用提示 */}
-        {recommendations.length === 0 && !loading && (
-          <div className="bg-white rounded-xl shadow-md p-6">
-            <h3 className="text-lg font-semibold text-gray-800 mb-4">💡 使用提示</h3>
-            <ul className="space-y-2 text-gray-600">
-              <li>• 描述您喜歡的口味：辣的、清淡的、鮮甜的</li>
-              <li>• 描述食材類型：肉類、海鮮、蔬菜</li>
-              <li>• 描述偏好：健康的、高級的、養生的</li>
-              <li>• 或直接說：我想吃麻辣的、我想吃牛肉</li>
-            </ul>
-          </div>
-        )}
-      </div>
-    </div>
-  );
-};
-
-export default HotpotRecommender;
+            document.getElementById('recommendations').classList.remove('hidden');
+            document.getElementById('usageTips').classList.add('hidden');
+        }
+    </script>
+</body>
+</html>
